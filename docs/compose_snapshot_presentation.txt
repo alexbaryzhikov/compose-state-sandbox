@@ -1,0 +1,138 @@
+Snapshot system
+
+0. State
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println(name.value)
+
+1. Take snapshot
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println(name.value)
+    val snapshot = Snapshot.takeSnapshot()
+    snapshot.dispose()
+
+2. Enter snapshot
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println("[root] " + name.value)
+    val snapshot = Snapshot.takeSnapshot()
+    name.value = "Bob"
+    println("[root] " + name.value)
+    snapshot.enter {
+        println("[snapshot] " + name.value)
+    }
+    snapshot.dispose()
+
+3. Mutate snapshot
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println("[root] " + name.value)
+    val snapshot = Snapshot.takeMutableSnapshot()
+    snapshot.enter {
+        name.value = "Bob"
+        println("[snapshot] " + name.value)
+    }
+    println("[root] " + name.value)
+    snapshot.dispose()
+
+
+4a. Apply snapshot
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println("[root] " + name.value)
+    val snapshot = Snapshot.takeMutableSnapshot()
+    snapshot.enter {
+        name.value = "Bob"
+        println("[snapshot] " + name.value)
+    }
+    println("[root] " + name.value)
+    snapshot.apply()
+    println("[root] " + name.value)
+    snapshot.dispose()
+
+4b. Apply snapshot
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println("[root] " + name.value)
+    Snapshot.withMutableSnapshot {
+        name.value = "Bob"
+        println("[snapshot] " + name.value)
+    }
+    println("[root] " + name.value)
+
+5. Observing state reads/writes
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println("[root] " + name.value)
+    val snapshot = Snapshot.takeMutableSnapshot(
+        readObserver = { if (it == name) println("name was read") },
+        writeObserver = { if (it == name) println("name was written") }
+    )
+    snapshot.enter {
+        name.value = "Bob"
+        println("[snapshot] " + name.value)
+    }
+    snapshot.dispose()
+
+5. Nested snapshots
+
+    val name = mutableStateOf("")
+    name.value = "Alice"
+    println("[root] " + name.value)
+    val outer = Snapshot.takeMutableSnapshot()
+    outer.enter {
+        name.value = "Bob"
+        println("[outer] " + name.value)
+        val inner = Snapshot.takeMutableSnapshot()
+        inner.enter {
+            name.value = "Cain"
+            println("[inner] " + name.value)
+        }
+        println("[outer] " + name.value)
+        inner.apply()
+        println("[outer] " + name.value)
+        inner.dispose()
+    }
+    println("[root] " + name.value)
+    outer.apply()
+    println("[root] " + name.value)
+    outer.dispose()
+
+6. Global snapshot
+
+    val name = mutableStateOf("")
+    Snapshot.registerApplyObserver { changed, snapshot ->
+        if (name in changed) println("name was changed to " + name.value)
+    }
+    println("before setting name")
+    name.value = "Alice"
+    println("after setting name")
+    println("before sending apply notifications")
+    Snapshot.sendApplyNotifications()
+    println("after sending apply notifications")
+
+7. Snapshot write conflicts
+
+    val name = mutableStateOf("", policy = object : SnapshotMutationPolicy<String> {
+        override fun equivalent(a: String, b: String): Boolean = a == b
+        override fun merge(previous: String, current: String, applied: String): String =
+            "$applied aka $current"
+    })
+    name.value = "Alice"
+    println("initial value: " + name.value)
+    val snapshot1 = Snapshot.takeMutableSnapshot()
+    val snapshot2 = Snapshot.takeMutableSnapshot()
+    snapshot1.enter { name.value = "Bob" }
+    snapshot2.enter { name.value = "Cain" }
+    snapshot1.apply().check()
+    println("snapshot1 applied: " + name.value)
+    snapshot2.apply().check()
+    println("snapshot2 applied: " + name.value)
