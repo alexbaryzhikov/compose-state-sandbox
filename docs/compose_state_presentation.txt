@@ -1,0 +1,219 @@
+1. Manual update
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var button: CounterButton
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        button = CounterButton(findViewById(R.id.button), Counter())
+        button.initialize()
+    }
+}
+
+class Counter {
+    var value: Int = 0
+
+    fun increment() {
+        value++
+    }
+
+    fun decrement() {
+        value--
+    }
+}
+
+class CounterButton(private val button: Button, private val counter: Counter) {
+    fun initialize() {
+        updateText()
+        button.setOnClickListener {
+            counter.increment()
+            updateText()
+        }
+        button.setOnLongClickListener {
+            counter.decrement()
+            updateText()
+            true
+        }
+    }
+
+    private fun updateText() {
+        button.text = "Counter: ${counter.value}"
+    }
+}
+
+2. Stream
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var button: CounterButton
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        button = CounterButton(findViewById(R.id.button), Counter())
+        button.initialize()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        button.finish()
+    }
+}
+
+class Counter {
+    private val _value: MutableStateFlow<Int> = MutableStateFlow(0)
+    val value: StateFlow<Int> get() = _value
+
+    fun increment() {
+        _value.value++
+    }
+
+    fun decrement() {
+        _value.value--
+    }
+}
+
+class CounterButton(private val button: Button, private val counter: Counter) {
+    private val buttonScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var updateJob: Job? = null
+
+    fun initialize() {
+        updateJob = counter.value
+            .onEach { updateText(it) }
+            .launchIn(buttonScope)
+        button.setOnClickListener {
+            counter.increment()
+        }
+        button.setOnLongClickListener {
+            counter.decrement()
+            true
+        }
+    }
+
+    private fun updateText(value: Int) {
+        button.text = "Counter: $value"
+    }
+
+    fun finish() {
+        updateJob?.cancel()
+    }
+}
+
+3. Multiple streams
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var button: CounterButton
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        button = CounterButton(findViewById(R.id.button), Counter())
+        button.initialize()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        button.finish()
+    }
+}
+
+class Counter {
+    private val _value: MutableStateFlow<Int> = MutableStateFlow(0)
+    val value: StateFlow<Int> get() = _value
+
+    private val _label: MutableStateFlow<String> = MutableStateFlow("Counter")
+    val label: StateFlow<String> = _label
+
+    fun increment() {
+        _value.value++
+    }
+
+    fun decrement() {
+        _value.value--
+    }
+
+    fun setLabel(label: String) {
+        _label.value = label
+    }
+}
+
+class CounterButton(private val button: Button, private val counter: Counter) {
+    private val buttonScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var updateJob: Job? = null
+
+    fun initialize() {
+        updateJob = combine(counter.value, counter.label) { value, label -> Pair(value, label) }
+            .onEach { (value, label) -> updateText(value, label) }
+            .launchIn(buttonScope)
+        button.setOnClickListener {
+            counter.increment()
+        }
+        button.setOnLongClickListener {
+            counter.setLabel(listOf("Alpha", "Beta", "Gamma").random())
+            true
+        }
+    }
+
+    private fun updateText(value: Int, label: String) {
+        button.text = "$label: $value"
+    }
+
+    fun finish() {
+        updateJob?.cancel()
+    }
+}
+
+4. Snapshot state
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var activityScope: CoroutineScope
+    private lateinit var button: CounterButton
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        activityScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+        activityScope.launch { advanceSnapshotTask() }
+
+        button = CounterButton(findViewById(R.id.button), Counter())
+        button.initialize()
+        snapshotFlow { button.updateText() }.launchIn(activityScope)
+    }
+
+    private suspend fun advanceSnapshotTask() {
+        while (true) {
+            delay(50)
+            Snapshot.sendApplyNotifications()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activityScope.cancel()
+    }
+}
+
+class Counter {
+    var value: Int by mutableStateOf(0)
+    var label: String by mutableStateOf("Counter")
+}
+
+class CounterButton(private val button: Button, private val counter: Counter) {
+    fun initialize() {
+        button.setOnClickListener {
+            counter.value++
+        }
+        button.setOnLongClickListener {
+            counter.label = listOf("Alpha", "Beta", "Gamma").random()
+            true
+        }
+    }
+
+    fun updateText() {
+        button.text = "${counter.label}: ${counter.value}"
+    }
+}
