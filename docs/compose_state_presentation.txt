@@ -1,3 +1,32 @@
+0. Button
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = CounterButton(findViewById(R.id.button), Counter())
+        button.initialize()
+    }
+}
+
+class Counter {
+    var value: Int = 0
+
+    fun increment() {
+        value++
+    }
+}
+
+class CounterButton(private val button: Button, private val counter: Counter) {
+    fun initialize() {
+        button.text = "Counter: ${counter.value}"
+        button.setOnClickListener {
+            counter.increment()
+        }
+    }
+}
+
 1. Manual update
 
 class MainActivity : AppCompatActivity() {
