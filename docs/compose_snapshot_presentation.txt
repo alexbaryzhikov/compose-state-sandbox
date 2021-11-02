@@ -40,7 +40,6 @@ Snapshot system
     println("[root] " + name.value)
     snapshot.dispose()
 
-
 4a. Apply snapshot
 
     val name = mutableStateOf("")
