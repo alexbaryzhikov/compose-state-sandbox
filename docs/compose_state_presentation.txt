@@ -174,8 +174,7 @@ class CounterButton(private val button: Button, private val counter: Counter) {
     private var updateJob: Job? = null
 
     fun initialize() {
-        updateJob = combine(counter.value, counter.label) { value, label -> Pair(value, label) }
-            .onEach { (value, label) -> updateText(value, label) }
+        updateJob = combine(counter.value, counter.label) { value, label -> updateText(value, label) }
             .launchIn(buttonScope)
         button.setOnClickListener {
             counter.increment()
@@ -206,18 +205,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         activityScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-        activityScope.launch { advanceSnapshotTask() }
+        activityScope.launch {
+          while (true) {
+              delay(50)
+              Snapshot.sendApplyNotifications()
+          }
+        }
 
         button = CounterButton(findViewById(R.id.button), Counter())
         button.initialize()
         snapshotFlow { button.updateText() }.launchIn(activityScope)
-    }
-
-    private suspend fun advanceSnapshotTask() {
-        while (true) {
-            delay(50)
-            Snapshot.sendApplyNotifications()
-        }
     }
 
     override fun onDestroy() {
