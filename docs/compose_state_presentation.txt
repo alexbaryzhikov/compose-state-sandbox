@@ -1,4 +1,5 @@
 0. Button
+Проблемы: это так не работает
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,6 +29,9 @@ class CounterButton(private val button: Button, private val counter: Counter) {
 }
 
 1. Manual update
+Проблемы:
+  - каждый апдейт состояния должен дергать UI, чтобы тот обновился
+  - дергать UI нужно с главного потока
 
 class MainActivity : AppCompatActivity() {
     private lateinit var button: CounterButton
@@ -73,6 +77,12 @@ class CounterButton(private val button: Button, private val counter: Counter) {
 }
 
 2. Stream
+Проблемы:
+  - менеджмент подписок
+  - дергать UI нужно на главном потоке
+  - клиентская логика должна быть выражена в виде цепочек операторов над стримами
+  - сложность некоторых операторов (например, при слиянии стримов)
+  - сложность анализа поведения при большом количестве стримов
 
 class MainActivity : AppCompatActivity() {
     private lateinit var button: CounterButton
@@ -195,6 +205,7 @@ class CounterButton(private val button: Button, private val counter: Counter) {
 }
 
 4. Snapshot state
+Проблемы: ?
 
 class MainActivity : AppCompatActivity() {
     private lateinit var activityScope: CoroutineScope
